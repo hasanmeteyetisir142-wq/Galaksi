@@ -118,6 +118,8 @@
 
         let popupTimer = null;
         let isSending = false;
+        let isLoadingConfessions = false;
+        let latestConfessionAt = null;
 
         function showPopup(message) {
             const pop = document.getElementById('msgPopup');
@@ -131,29 +133,45 @@
         }
 
         async function loadConfessions() {
-            try {
-                const rows = await supabaseRequest(
-                    '?select=id,galaxy_id,confession,x_norm,y_norm,created_at&order=created_at.asc&limit=2000'
-                );
+            if (isLoadingConfessions) return;
+            isLoadingConfessions = true;
 
-                galaxyData = { 0: [], 1: [], 2: [] };
+            try {
+                let query = '?select=id,galaxy_id,confession,x_norm,y_norm,created_at&order=created_at.asc&limit=2000';
+                if (latestConfessionAt) {
+                    // Re-read the latest timestamp too, then deduplicate by ID.
+                    query += '&created_at=gte.' + encodeURIComponent(latestConfessionAt);
+                }
+
+                const rows = await supabaseRequest(query);
                 rows.forEach(row => {
                     const galaxyId = Number(row.galaxy_id);
                     if (!galaxyData[galaxyId]) return;
 
-                    galaxyData[galaxyId].push({
-                        id: row.id,
-                        x: Number(row.x_norm) * width,
-                        y: Number(row.y_norm) * height,
-                        size: 1.5 + Math.random(),
-                        text: row.confession,
-                        birthTime: Date.now(),
-                        pulse: Math.random() * 10
-                    });
+                    const alreadyLoaded = galaxyData[galaxyId].some(item => item.id === row.id);
+                    if (!alreadyLoaded) {
+                        galaxyData[galaxyId].push({
+                            id: row.id,
+                            x: Number(row.x_norm) * width,
+                            y: Number(row.y_norm) * height,
+                            size: 1.5 + Math.random(),
+                            text: row.confession,
+                            birthTime: Date.now(),
+                            pulse: Math.random() * 10
+                        });
+                    }
+
+                    if (!latestConfessionAt || row.created_at > latestConfessionAt) {
+                        latestConfessionAt = row.created_at;
+                    }
                 });
             } catch (error) {
                 console.error('İtiraflar yüklenemedi:', error);
-                showPopup('İtiraflar şu anda yüklenemedi. Sayfayı yenileyebilirsin.');
+                if (!latestConfessionAt) {
+                    showPopup('İtiraflar şu anda yüklenemedi. Sayfayı yenileyebilirsin.');
+                }
+            } finally {
+                isLoadingConfessions = false;
             }
         }
 
@@ -269,11 +287,11 @@
             }
 
             try {
-                await supabaseRequest('', {
+                const savedRows = await supabaseRequest('', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Prefer': 'return=minimal'
+                        'Prefer': 'return=representation'
                     },
                     body: JSON.stringify({
                         galaxy_id: galaxyId,
@@ -286,6 +304,7 @@
                 input.value = '';
                 setTimeout(() => {
                     galaxyData[galaxyId].push({
+                        id: savedRows && savedRows[0] ? savedRows[0].id : null,
                         x: x,
                         y: y,
                         size: 1.5 + Math.random(),
@@ -423,6 +442,8 @@
         });
 
         loadConfessions();
+        // Refresh new public confessions from other visitors every 15 seconds.
+        setInterval(loadConfessions, 15000);
         draw();
     </script>
 </body>
