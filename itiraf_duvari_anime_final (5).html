@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yıldızlı İtiraf Duvarı - Final</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #020208; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        .ui-container {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 10; width: 90%; max-width: 500px; text-align: center;
+        }
+        input {
+            width: 70%; padding: 14px 20px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 25px; color: white; font-size: 1rem; outline: none; transition: 0.3s; backdrop-filter: blur(10px);
+        }
+        input:focus { border-color: #a855f7; background: rgba(255,255,255,0.15); }
+        button {
+            width: 25%; padding: 14px; margin-left: 3%; background: linear-gradient(45deg, #a855f7, #6366f1);
+            border: none; border-radius: 25px; color: white; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(168,85,247,0.6); }
+        
+        /* Galaksi Seçim Okları */
+        .nav-arrow {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+            color: white; font-size: 2rem; width: 60px; height: 60px; border-radius: 50%;
+            cursor: pointer; z-index: 10; display: flex; justify-content: center; align-items: center;
+            transition: 0.3s; backdrop-filter: blur(5px);
+        }
+        .nav-arrow:hover { background: rgba(168,85,247,0.3); border-color: #a855f7; color: white; }
+        .arrow-left { left: 20px; }
+        .arrow-right { right: 20px; }
+        
+        /* Üst Başlık ve Galaksi Adı */
+        .galaxy-header {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            color: white; text-align: center; z-index: 10; pointer-events: none;
+        }
+        .galaxy-name { font-size: 1.8rem; font-weight: bold; letter-spacing: 2px; color: #c084fc; text-shadow: 0 0 10px rgba(168,85,247,0.5); }
+        .galaxy-sub { font-size: 0.9rem; color: rgba(255,255,255,0.5); margin-top: 5px; }
+
+        .popup {
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(10, 10, 25, 0.85); border: 1px solid #a855f7; padding: 20px 40px;
+            border-radius: 15px; color: white; text-align: center; pointer-events: none;
+            opacity: 0; transition: opacity 0.4s, transform 0.4s; z-index: 20; box-shadow: 0 0 30px rgba(168,85,247,0.4);
+            max-width: 80%; font-size: 1.1rem; font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="galaxy-header">
+        <div class="galaxy-name" id="galaxyName">SAMANYOLU GALAKSİSİ</div>
+        <div class="galaxy-sub">Yıldızlara tıklayarak sırları oku...</div>
+    </div>
+
+    <button class="nav-arrow arrow-left" onclick="changeGalaxy(-1)">‹</button>
+    <button class="nav-arrow arrow-right" onclick="changeGalaxy(1)">›</button>
+
+    <canvas id="space"></canvas>
+    
+    <div class="ui-container">
+        <input type="text" id="confessionInput" placeholder="Sırrını bu galaksiye bırak...">
+        <button id="sendBtn" onclick="launchConfession()">FIRLAT</button>
+    </div>
+    
+    <div id="msgPopup" class="popup"></div>
+
+    <script>
+        const canvas = document.getElementById('space');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const galaxies = ["SAMANYOLU GALAKSİSİ", "ANDROMEDA GALAKSİSİ", "SOMBRERO GALAKSİSİ"];
+        let currentGalaxyIdx = 0;
+
+        // Her galaksi için bağımsız kalıcı yıldız odaları
+        let galaxyData = {
+            0: [], // Samanyolu sırları
+            1: [], // Andromeda sırları
+            2: []  // Sombrero sırları
+        };
+
+        let backgroundStars = [];
+        for(let i=0; i<200; i++) {
+            backgroundStars.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                z: Math.random() * width,
+                size: Math.random() * 1.5 + 0.5
+            });
+        }
+
+        let warpSpeed = 0.5;
+        let isWarping = false;
+        let warpTimer = 0;
+        let supernovaParticles = [];
+
+        // MAKSİMUM SES GÜCÜ: Web Audio API ile güçlü sentezleyici patlama sesi
+        function playKozmikSes() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Birinci osilatör (Düşük patlama frekansı)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(120, audioCtx.currentTime);
+                osc1.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.6);
+                
+                // İkinci osilatör (Yüksek fırlama çınlaması)
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc2.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.5);
+
+                // MAKSİMUM SEVİYE: Gain düğümlerini sonuna kadar açıp birleştiriyoruz
+                gain1.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+                
+                gain2.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+
+                osc1.start();
+                osc2.start();
+                osc1.stop(audioCtx.currentTime + 0.6);
+                osc2.stop(audioCtx.currentTime + 0.5);
+            } catch(e) { console.log(e); }
+        }
+
+        function playTiklaSes() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        function launchConfession() {
+            const input = document.getElementById('confessionInput');
+            const txt = input.value.trim();
+            if(!txt) return;
+
+            input.value = '';
+            isWarping = true;
+            warpTimer = 40; // Işık hızı süresi
+
+            playKozmikSes();
+
+            // Süpernova parçacıkları (Merkezden dışa)
+            supernovaParticles = [];
+            for(let i=0; i<100; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 4 + Math.random() * 10;
+                supernovaParticles.push({
+                    x: width / 2,
+                    y: height / 2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: `hsl(${270 + Math.random() * 50}, 100%, 65%)`,
+                    size: 2 + Math.random() * 4,
+                    alpha: 1
+                });
+            }
+
+            // KÜÇÜK VE ESTETİK KALICI YILDIZ: Sadece 1.5px - 2.5px boyutunda!
+            setTimeout(() => {
+                galaxyData[currentGalaxyIdx].push({
+                    x: Math.random() * (width - 160) + 80,
+                    y: Math.random() * (height - 250) + 80,
+                    size: 1.5 + Math.random() * 1, // KÜÇÜK VE ESTETİK BOYUT
+                    text: txt,
+                    birthTime: Date.now(),
+                    pulse: Math.random() * 10
+                });
+            }, 600);
+        }
+
+        function changeGalaxy(dir) {
+            currentGalaxyIdx = (currentGalaxyIdx + dir + galaxies.length) % galaxies.length;
+            document.getElementById('galaxyName').innerText = galaxies[currentGalaxyIdx];
+            
+            // Galaksiler arası ışık hızı efekti geçişi
+            isWarping = true;
+            warpTimer = 25;
+            playKozmikSes();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#020208';
+            ctx.fillRect(0, 0, width, height);
+
+            // 1. IŞIK HIZI (WARP SPEED) ANİMASYONU
+            if (isWarping) {
+                warpSpeed = Math.min(warpSpeed + 2.5, 45);
+                warpTimer--;
+                if(warpTimer <= 0) isWarping = false;
+            } else {
+                warpSpeed = Math.max(warpSpeed - 1.5, 0.6);
+            }
+
+            backgroundStars.forEach(s => {
+                s.z -= warpSpeed;
+                if(s.z <= 0) s.z = width;
+
+                let px = (s.x - width/2) * (width/s.z) + width/2;
+                let py = (s.y - height/2) * (width/s.z) + height/2;
+
+                if (isWarping) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = s.size;
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + (px - width/2) * 0.08, py + (py - height/2) * 0.08);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                    ctx.beginPath();
+                    ctx.arc(px, py, s.size, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            });
+
+            // 2. SÜPERNOVA PATLAMA PARÇACIKLARI
+            supernovaParticles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.02;
+                if(p.alpha <= 0) {
+                    supernovaParticles.splice(index, 1);
+                    return;
+                }
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 3. AKTİF GALAKSİDEKİ KALICI SIR YILDIZLARI (KÜÇÜK, ESTETİK VE ZAMAN AYARLI MOR-BEYAZ)
+            const currentList = galaxyData[currentGalaxyIdx];
+            const now = Date.now();
+
+            currentList.forEach(c => {
+                c.pulse += 0.04;
+                let age = now - c.birthTime;
+                
+                ctx.save();
+                // İlk 4 saniye boyunca mor aura baskın, sonra tamamen sönüp yok olan mor kısım
+                if (age < 4000) {
+                    let morAlpha = 1 - (age / 4000);
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = `rgba(168, 85, 247, ${morAlpha})`;
+                    ctx.fillStyle = `rgba(192, 132, 252, ${morAlpha})`;
+                    ctx.beginPath();
+                    ctx.arc(c.x, c.y, c.size + 2, 0, Math.PI*2); // İlk başta mor genişlik
+                    ctx.fill();
+                }
+
+                // KALICI OLAN KÜÇÜK BEYAZ YILDIZ KISMI (Boyutu hiç değişmez, kibar kalır)
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = '#ffffff';
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, c.size + Math.sin(c.pulse) * 0.3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        // Tıklama alanını esnek tutarak küçük yıldızları kolayca yakalama algoritması
+        window.addEventListener('click', (e) => {
+            if(e.clientY > height - 100 || e.clientX < 100 || e.clientX > width - 100) return;
+            
+            const currentList = galaxyData[currentGalaxyIdx];
+            currentList.forEach(c => {
+                let dist = Math.hypot(c.x - e.clientX, c.y - e.clientY);
+                if(dist < 25) { // Tolerans çapı
+                    playTiklaSes();
+                    const pop = document.getElementById('msgPopup');
+                    pop.innerText = `🌌 Saklı Sır: "${c.text}"`;
+                    pop.style.opacity = 1;
+                    pop.style.transform = 'translate(-50%, -50%) scale(1)';
+                    setTimeout(() => {
+                        pop.style.opacity = 0;
+                    }, 4000);
+                }
+            });
+        });
+
+        // Enter tuşu desteği
+        document.getElementById('confessionInput').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') launchConfession();
+        });
+
+        draw();
+    </script>
+</body>
+</html>
