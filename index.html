@@ -137,7 +137,7 @@
             isLoadingConfessions = true;
 
             try {
-                let query = '?select=id,galaxy_id,confession,x_norm,y_norm,created_at&order=created_at.asc&limit=2000';
+                let query = '?select=id,galaxy_id,confession,x_norm,y_norm,created_at&order=created_at.desc&limit=2000';
                 if (latestConfessionAt) {
                     // Re-read the latest timestamp too, then deduplicate by ID.
                     query += '&created_at=gte.' + encodeURIComponent(latestConfessionAt);
@@ -154,6 +154,8 @@
                             id: row.id,
                             x: Number(row.x_norm) * width,
                             y: Number(row.y_norm) * height,
+                            xNorm: Number(row.x_norm),
+                            yNorm: Number(row.y_norm),
                             size: 1.5 + Math.random(),
                             text: row.confession,
                             birthTime: Date.now(),
@@ -174,6 +176,17 @@
                 isLoadingConfessions = false;
             }
         }
+
+        window.addEventListener('resize', () => {
+            Object.values(galaxyData).forEach(stars => {
+                stars.forEach(star => {
+                    if (Number.isFinite(star.xNorm) && Number.isFinite(star.yNorm)) {
+                        star.x = star.xNorm * width;
+                        star.y = star.yNorm * height;
+                    }
+                });
+            });
+        });
 
         let backgroundStars = [];
         for(let i=0; i<200; i++) {
@@ -258,8 +271,10 @@
             const galaxyId = currentGalaxyIdx;
             const safeWidth = Math.max(width, 1);
             const safeHeight = Math.max(height, 1);
-            const x = Math.min(Math.max(Math.random() * (width - 160) + 80, 10), width - 10);
-            const y = Math.min(Math.max(Math.random() * (height - 250) + 80, 70), height - 110);
+            const x = Math.min(Math.max(Math.random() * Math.max(1, width - 160) + 80, 10), Math.max(10, width - 10));
+            const y = Math.min(Math.max(Math.random() * Math.max(1, height - 250) + 80, 70), Math.max(70, height - 110));
+            const xNorm = Math.min(1, Math.max(0, x / safeWidth));
+            const yNorm = Math.min(1, Math.max(0, y / safeHeight));
 
             isSending = true;
             const sendButton = document.getElementById('sendBtn');
@@ -296,8 +311,8 @@
                     body: JSON.stringify({
                         galaxy_id: galaxyId,
                         confession: txt,
-                        x_norm: Math.min(1, Math.max(0, x / safeWidth)),
-                        y_norm: Math.min(1, Math.max(0, y / safeHeight))
+                        x_norm: xNorm,
+                        y_norm: yNorm
                     })
                 });
 
@@ -307,6 +322,8 @@
                         id: savedRows && savedRows[0] ? savedRows[0].id : null,
                         x: x,
                         y: y,
+                        xNorm: xNorm,
+                        yNorm: yNorm,
                         size: 1.5 + Math.random(),
                         text: txt,
                         birthTime: Date.now(),
