@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Galaksi • Minecraft Yönetim Paneli</title>
+<style>
+:root{color-scheme:dark;--bg:#080914;--panel:#111426;--line:#272b48;--purple:#a78bfa;--muted:#a6abc5;--text:#f4f3ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#26204b 0,transparent 42%),var(--bg);color:var(--text);font:15px/1.5 system-ui,Segoe UI,sans-serif;min-height:100vh}
+header{padding:26px max(20px,calc((100% - 1050px)/2));border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px}
+h1{font-size:22px;margin:0}header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+a{color:#c4b5fd}.wrap{max-width:1050px;margin:28px auto;padding:0 18px}
+.notice{background:#211b35;border:1px solid #514078;padding:14px 16px;border-radius:14px;color:#e8ddff;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.card{background:linear-gradient(160deg,#15182d,#101222);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 35px #0003}
+h2{font-size:17px;margin:0 0 14px}.muted{color:var(--muted);font-size:13px}
+label{display:block;color:#c8c9dd;font-size:13px;margin:12px 0 6px}
+input,select,textarea{width:100%;background:#090c19;border:1px solid #353a5c;border-radius:9px;padding:11px;color:var(--text);font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--purple)}
+button{border:0;border-radius:9px;padding:11px 14px;background:linear-gradient(100deg,#8b5cf6,#6366f1);color:white;font-weight:700;cursor:pointer}
+button.secondary{background:#252943;border:1px solid #3b4164}button:focus-visible{outline:2px solid white;outline-offset:2px}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#080b16;border:1px solid var(--line);border-radius:10px;padding:14px;min-height:48px;color:#d8ccff}
+footer{padding:28px 0;color:var(--muted);font-size:12px}
+.status{display:inline-flex;align-items:center;gap:8px;border:1px solid #5b4a25;background:#2a2416;color:#f5d98b;padding:5px 10px;border-radius:99px;font-size:12px}
+.dot{width:7px;height:7px;border-radius:50%;background:#eab308}
+</style>
+</head>
+<body>
+<header><div><h1>🌌 Galaksi Minecraft Paneli</h1><p>Ücretsiz Aternos yardımcı paneli</p></div><a href="../">Ana siteye dön ↗</a></header>
+<main class="wrap">
+<div class="notice"><strong>Önemli — Aternos bağlantısı:</strong> Aternos, üçüncü taraf sitelerden sunucu konsoluna doğrudan komut göndermek için herkese açık bir API sunmaz. Bu panel komutları hazırlar; sunucun açıkken Aternos → Sunucu → Konsol bölümüne yapıştırıp çalıştırabilirsin. Sunucuyu 7/24 açık tutma veya kapalıyken komut çalıştırma özelliği yoktur.</div>
+<div class="grid">
+<section class="card">
+<h2>📢 Duyuru gönder</h2><p class="muted">Oyunculara sunucu içi mesaj hazırla.</p>
+<label for="say">Mesaj</label><input id="say" maxlength="180" placeholder="Merhaba oyuncular!">
+<div class="actions"><button onclick="makeSay()">Komutu hazırla</button></div>
+</section>
+<section class="card">
+<h2>👢 Oyuncu at</h2><p class="muted">Oyuncuyu sunucudan çıkarma komutu.</p>
+<label for="kickName">Oyuncu adı</label><input id="kickName" maxlength="16" placeholder="OyuncuAdi">
+<label for="kickReason">Sebep (isteğe bağlı)</label><input id="kickReason" maxlength="100" placeholder="Kural ihlali">
+<div class="actions"><button onclick="makeKick()">Komutu hazırla</button></div>
+</section>
+<section class="card">
+<h2>⛔ Yasakla / yasağı kaldır</h2>
+<label for="banName">Oyuncu adı</label><input id="banName" maxlength="16" placeholder="OyuncuAdi">
+<div class="actions"><button onclick="makeBan()">Ban komutu</button><button class="secondary" onclick="makePardon()">Ban kaldır</button></div>
+</section>
+<section class="card">
+<h2>🎮 Oyun modu</h2>
+<label for="mode">Mod</label><select id="mode"><option value="survival">Survival</option><option value="creative">Creative</option><option value="adventure">Adventure</option><option value="spectator">Spectator</option></select>
+<label for="modeName">Oyuncu</label><input id="modeName" maxlength="16" placeholder="OyuncuAdi">
+<div class="actions"><button onclick="makeMode()">Komutu hazırla</button></div>
+</section>
+<section class="card">
+<h2>🌤️ Dünya ayarları</h2>
+<label for="worldAction">İşlem</label><select id="worldAction"><option value="time set day">Gündüz yap</option><option value="time set night">Gece yap</option><option value="weather clear">Havayı aç</option><option value="weather rain">Yağmur başlat</option><option value="weather thunder">Fırtına başlat</option></select>
+<div class="actions"><button onclick="makeWorld()">Komutu hazırla</button></div>
+</section>
+<section class="card">
+<h2>🎁 Eşya ver</h2>
+<label for="giveName">Oyuncu</label><input id="giveName" maxlength="16" placeholder="OyuncuAdi">
+<label for="item">Minecraft eşya kimliği</label><input id="item" maxlength="60" placeholder="minecraft:diamond">
+<label for="amount">Miktar (1–64)</label><input id="amount" type="number" min="1" max="64" value="1">
+<div class="actions"><button onclick="makeGive()">Komutu hazırla</button></div>
+</section>
+</div>
+<section class="card" style="margin-top:16px">
+<h2>⌨️ Hazır komutun</h2><p class="muted">Komutu kopyala, Aternos konsoluna yapıştır. Başına / koymana gerek yok.</p>
+<pre id="output" aria-live="polite">Henüz komut oluşturulmadı.</pre>
+<div class="actions"><button onclick="copyCommand()">Komutu kopyala</button><button class="secondary" onclick="clearCommand()">Temizle</button></div>
+<p id="feedback" class="muted" aria-live="polite"></p>
+</section>
+<div class="card" style="margin-top:16px">
+<h2>🧭 Nasıl kullanılır?</h2>
+<ol class="muted"><li>Aternos hesabından sunucunu başlat.</li><li>Sunucu açılınca Aternos panelindeki <strong>Konsol</strong> sekmesine gir.</li><li>Yukarıdan istediğin işlemi seçip komutu oluştur ve kopyala.</li><li>Komutu konsola yapıştırıp Enter'a bas.</li></ol>
+<p class="muted">Bu sayfa GitHub Pages üzerinde ücretsiz çalışır. Aternos hesabının şifresini veya oturum çerezlerini bu sayfaya girme.</p>
+</div>
+<footer>Galaksi • Minecraft yardımcı paneli · Aternos tarafından desteklenmez veya işletilmez.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let command='';
+function player(id){const v=$(id).value.trim();if(!/^[A-Za-z0-9_]{1,16}$/.test(v))throw Error('Oyuncu adı 1–16 karakter olmalı; yalnızca harf, rakam ve _ kullan.');return v}
+function setCommand(value){command=value;$('output').textContent=value;$('feedback').textContent='Komut hazır.'}
+function run(fn){try{fn()}catch(e){$('feedback').textContent=e.message}}
+function makeSay(){run(()=>{const v=$('say').value.trim();if(!v)throw Error('Önce duyuru mesajını yaz.');setCommand('say '+v.replace(/[\r\n]/g,' '))})}
+function makeKick(){run(()=>{const p=player('kickName'),r=$('kickReason').value.trim().replace(/[\r\n]/g,' ');setCommand('kick '+p+(r?' '+r:''))})}
+function makeBan(){run(()=>setCommand('ban '+player('banName')))}
+function makePardon(){run(()=>setCommand('pardon '+player('banName')))}
+function makeMode(){run(()=>setCommand('gamemode '+$('mode').value+' '+player('modeName')))}
+function makeWorld(){setCommand($('worldAction').value)}
+function makeGive(){run(()=>{const p=player('giveName'),item=$('item').value.trim(),n=Number($('amount').value);if(!/^(minecraft:)?[a-z0-9_./-]+$/.test(item))throw Error('Geçerli bir eşya kimliği gir. Örnek: minecraft:diamond');if(!Number.isInteger(n)||n<1||n>64)throw Error('Miktar 1 ile 64 arasında tam sayı olmalı.');setCommand('give '+p+' '+(item.includes(':')?item:'minecraft:'+item)+' '+n)})}
+async function copyCommand(){if(!command){$('feedback').textContent='Önce bir komut oluştur.';return}try{await navigator.clipboard.writeText(command);$('feedback').textContent='Kopyalandı! Aternos konsoluna yapıştırabilirsin.'}catch(e){$('feedback').textContent='Tarayıcı kopyalamaya izin vermedi. Komutu seçip Ctrl+C yap.'}}
+function clearCommand(){command='';$('output').textContent='Henüz komut oluşturulmadı.';$('feedback').textContent=''}
+</script>
+</body>
+</html>
