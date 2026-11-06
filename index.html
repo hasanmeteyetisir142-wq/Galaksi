@@ -65,13 +65,36 @@
     <canvas id="space"></canvas>
     
     <div class="ui-container">
-        <input type="text" id="confessionInput" placeholder="Sırrını bu galaksiye bırak...">
+        <input type="text" id="confessionInput" maxlength="280" placeholder="Sırrını bu galaksiye bırak...">
         <button id="sendBtn" onclick="launchConfession()">FIRLAT</button>
     </div>
     
     <div id="msgPopup" class="popup"></div>
 
     <script>
+        // Public browser configuration. The publishable key is intended for frontend use;
+        // Row Level Security controls what anonymous visitors can do.
+        const SUPABASE_URL = 'https://nmjflyhxwnclorzcwhka.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_i6BMU546FsDRAIx62r13IA_LVFfIHwB';
+        const CONFESSIONS_ENDPOINT = `${SUPABASE_URL}/rest/v1/confessions`;
+
+        async function supabaseRequest(query = '', options = {}) {
+            const response = await fetch(`${CONFESSIONS_ENDPOINT}${query}`, {
+                ...options,
+                headers: {
+                    apikey: SUPABASE_PUBLISHABLE_KEY,
+                    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                    ...(options.headers || {})
+                }
+            });
+
+            const responseText = await response.text();
+            if (!response.ok) {
+                throw new Error(responseText || `Supabase request failed: ${response.status}`);
+            }
+            return responseText ? JSON.parse(responseText) : null;
+        }
+
         const canvas = document.getElementById('space');
         const ctx = canvas.getContext('2d');
         let width, height;
@@ -92,6 +115,47 @@
             1: [], // Andromeda sırları
             2: []  // Sombrero sırları
         };
+
+        let popupTimer = null;
+        let isSending = false;
+
+        function showPopup(message) {
+            const pop = document.getElementById('msgPopup');
+            pop.textContent = message;
+            pop.style.opacity = 1;
+            pop.style.transform = 'translate(-50%, -50%) scale(1)';
+            if (popupTimer) clearTimeout(popupTimer);
+            popupTimer = setTimeout(() => {
+                pop.style.opacity = 0;
+            }, 4000);
+        }
+
+        async function loadConfessions() {
+            try {
+                const rows = await supabaseRequest(
+                    '?select=id,galaxy_id,confession,x_norm,y_norm,created_at&order=created_at.asc&limit=2000'
+                );
+
+                galaxyData = { 0: [], 1: [], 2: [] };
+                rows.forEach(row => {
+                    const galaxyId = Number(row.galaxy_id);
+                    if (!galaxyData[galaxyId]) return;
+
+                    galaxyData[galaxyId].push({
+                        id: row.id,
+                        x: Number(row.x_norm) * width,
+                        y: Number(row.y_norm) * height,
+                        size: 1.5 + Math.random(),
+                        text: row.confession,
+                        birthTime: Date.now(),
+                        pulse: Math.random() * 10
+                    });
+                });
+            } catch (error) {
+                console.error('İtiraflar yüklenemedi:', error);
+                showPopup('İtiraflar şu anda yüklenemedi. Sayfayı yenileyebilirsin.');
+            }
+        }
 
         let backgroundStars = [];
         for(let i=0; i<200; i++) {
@@ -163,20 +227,34 @@
             } catch(e) {}
         }
 
-        function launchConfession() {
+        async function launchConfession() {
             const input = document.getElementById('confessionInput');
             const txt = input.value.trim();
-            if(!txt) return;
+            if (!txt || isSending) return;
 
-            input.value = '';
+            if (txt.length > 280) {
+                showPopup('İtiraf en fazla 280 karakter olabilir.');
+                return;
+            }
+
+            const galaxyId = currentGalaxyIdx;
+            const safeWidth = Math.max(width, 1);
+            const safeHeight = Math.max(height, 1);
+            const x = Math.min(Math.max(Math.random() * (width - 160) + 80, 10), width - 10);
+            const y = Math.min(Math.max(Math.random() * (height - 250) + 80, 70), height - 110);
+
+            isSending = true;
+            const sendButton = document.getElementById('sendBtn');
+            sendButton.disabled = true;
+            sendButton.textContent = 'GÖNDERİLİYOR...';
+
             isWarping = true;
-            warpTimer = 40; // Işık hızı süresi
-
+            warpTimer = 40;
             playKozmikSes();
 
             // Süpernova parçacıkları (Merkezden dışa)
             supernovaParticles = [];
-            for(let i=0; i<100; i++) {
+            for (let i = 0; i < 100; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const speed = 4 + Math.random() * 10;
                 supernovaParticles.push({
@@ -190,17 +268,43 @@
                 });
             }
 
-            // KÜÇÜK VE ESTETİK KALICI YILDIZ: Sadece 1.5px - 2.5px boyutunda!
-            setTimeout(() => {
-                galaxyData[currentGalaxyIdx].push({
-                    x: Math.random() * (width - 160) + 80,
-                    y: Math.random() * (height - 250) + 80,
-                    size: 1.5 + Math.random() * 1, // KÜÇÜK VE ESTETİK BOYUT
-                    text: txt,
-                    birthTime: Date.now(),
-                    pulse: Math.random() * 10
+            try {
+                await supabaseRequest('', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        galaxy_id: galaxyId,
+                        confession: txt,
+                        x_norm: Math.min(1, Math.max(0, x / safeWidth)),
+                        y_norm: Math.min(1, Math.max(0, y / safeHeight))
+                    })
                 });
-            }, 600);
+
+                input.value = '';
+                setTimeout(() => {
+                    galaxyData[galaxyId].push({
+                        x: x,
+                        y: y,
+                        size: 1.5 + Math.random(),
+                        text: txt,
+                        birthTime: Date.now(),
+                        pulse: Math.random() * 10
+                    });
+                    if (currentGalaxyIdx === galaxyId) {
+                        showPopup('İtirafın yıldızlara eklendi! ✨');
+                    }
+                }, 600);
+            } catch (error) {
+                console.error('İtiraf kaydedilemedi:', error);
+                showPopup('İtiraf gönderilemedi. İnternet bağlantısını kontrol edip tekrar dene.');
+            } finally {
+                isSending = false;
+                sendButton.disabled = false;
+                sendButton.textContent = 'FIRLAT';
+            }
         }
 
         function changeGalaxy(dir) {
@@ -308,13 +412,7 @@
                 let dist = Math.hypot(c.x - e.clientX, c.y - e.clientY);
                 if(dist < 25) { // Tolerans çapı
                     playTiklaSes();
-                    const pop = document.getElementById('msgPopup');
-                    pop.innerText = `🌌 Saklı Sır: "${c.text}"`;
-                    pop.style.opacity = 1;
-                    pop.style.transform = 'translate(-50%, -50%) scale(1)';
-                    setTimeout(() => {
-                        pop.style.opacity = 0;
-                    }, 4000);
+                    showPopup(`🌌 Saklı Sır: "${c.text}"`);
                 }
             });
         });
@@ -324,6 +422,7 @@
             if(e.key === 'Enter') launchConfession();
         });
 
+        loadConfessions();
         draw();
     </script>
 </body>
